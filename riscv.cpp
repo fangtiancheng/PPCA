@@ -1,4 +1,6 @@
 #include <iostream>
+#include <cstring>
+#include <cstdio>
 //面向硬件编程
 enum INSTRUCTION{
     LUI,      //U
