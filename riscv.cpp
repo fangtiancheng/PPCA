@@ -707,7 +707,7 @@ private:
 };
 
 int main(){
-    freopen(".\\testcases\\hanoi.data","r",stdin);
+    // freopen(".\\testcases\\hanoi.data","r",stdin);
     CPU my_CPU;
     my_CPU.run();
     return 0;
