@@ -635,6 +635,8 @@ private:
                 case SW: sw();break;
             }
             // printf("MEM_index = 0x%x  To_MEM = 0x%x  To_WB = 0x%x\n",EX_MEM.MEM_index,EX_MEM.to_MEM,EX_MEM.to_WB);
+            int cur_tick=0;
+            while(cur_tick!=3) cur_tick++;
         }
         // else puts("");
         MEM_WB.type=EX_MEM.type;
