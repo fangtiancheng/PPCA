@@ -472,8 +472,9 @@ private:
             if(EX_MEM.instruction==LB||EX_MEM.instruction==LH||
             EX_MEM.instruction==LBU||EX_MEM.instruction==LHU||EX_MEM.instruction==LW){
                 WB();MEM();
+                rs = (prev_rd1==0)?0:prev_value2;
             }
-            rs = (prev_rd1==0)?0:prev_value1;
+            else rs = (prev_rd1==0)?0:prev_value1;
         }
         else if(rs==prev_rd2){
             rs = (prev_rd2==0)?0:prev_value2;
@@ -706,7 +707,7 @@ private:
 };
 
 int main(){
-    // freopen(".\\testcases\\hanoi.data","r",stdin);
+    freopen(".\\testcases\\hanoi.data","r",stdin);
     CPU my_CPU;
     my_CPU.run();
     return 0;
