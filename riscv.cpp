@@ -115,14 +115,14 @@ public:
 
 INSTRUCTION decoder(uint32_t num){//取raw指令,返回指令
     INSTRUCTION instruction;
-    if(num%4 != 0x3) throw error(__LINE__,num);
+    if((num&3u) != 0x3) throw error(__LINE__,num);
     unsigned int sub_num1 = (num>>12)%8;
-    if( (num>>2)%2 == 0x1) {//                      111
-        if((num>>3)%2 == 0x1){//                   1111
+    if( ((num>>2)&1) == 0x1) {//                      111
+        if(  ((num>>3)&1) == 0x1){//                   1111
             instruction = JAL;
         } else {//                                 0111
-            if((num>>4)%2== 0x1){//               10111
-                if((num>>5)%2 == 0x1){//         010111
+            if(  ((num>>4)&1) == 0x1){//               10111
+                if(  ((num>>5)&1) == 0x1){//         010111
                     instruction = LUI;
                 }else {//                        110111
                     instruction = AUIPC;
@@ -132,11 +132,11 @@ INSTRUCTION decoder(uint32_t num){//取raw指令,返回指令
             }
         }
     }else{//                                        011
-        if((num>>3)%2 == 0x1) throw error(__LINE__,num);//     1011
-        if((num>>4)%2 == 0x1){//                  10011
-            if((num>>6)%2 == 0x1) throw error(__LINE__,num);
+        if(  ((num>>3)&1u) == 0x1) throw error(__LINE__,num);//     1011
+        if(  ((num>>4)&1u) == 0x1){//                  10011
+            if(  ((num>>6)&1u) == 0x1) throw error(__LINE__,num);
             unsigned int sub_num2 = (num>>30);
-            if((num>>5)%2 == 0x1){//            0110011
+            if(  ((num>>5)&1u) == 0x1){//            0110011
                 switch (sub_num1){
                     case 0x0:
                         if(sub_num2==0x1) instruction = SUB;
@@ -171,8 +171,8 @@ INSTRUCTION decoder(uint32_t num){//取raw指令,返回指令
                 }
             }
         }else{//                                  00011
-            if((num>>5)%2 == 0x1){//             100011
-                if((num>>6)%2 == 0x1){//            1100011
+            if(  ((num>>5)&1) == 0x1){//             100011
+                if(  ((num>>6)&1) == 0x1){//            1100011
                     switch (sub_num1){//             1100011
                         case 0x0: instruction = BEQ;  break;
                         case 0x1: instruction = BNE;  break;
@@ -191,7 +191,7 @@ INSTRUCTION decoder(uint32_t num){//取raw指令,返回指令
                     }
                 }
             }else{//                             000011
-                if((num>>6)%2 == 0x1) throw error(__LINE__,num);
+                if(  ((num>>6)&1u) == 0x1) throw error(__LINE__,num);
                 switch (sub_num1){//             0000011
                     case 0x0: instruction = LB;   break;
                     case 0x1: instruction = LH;   break;
@@ -458,36 +458,25 @@ private:
         IF_ID.NOP=false;
     }
     void check_broadcast(uint32_t& rs){
-        WB();
-        MEM();
-        WB();
-        rs = REGI[rs];
-        return;
+        // WB();
+        // MEM();
+        // WB();
+        // rs = REGI[rs];
+        // return;
 //====================================不冒险，直接停=========================================
         const uint32_t prev_rd1 = (EX_MEM.type!=_S && EX_MEM.type!=_B && !EX_MEM.NOP)?EX_MEM.WB_index:320;//还没MEM 修改WB的寄存器
         const uint32_t prev_rd2 = (MEM_WB.type!=_S && MEM_WB.type!=_B && !MEM_WB.NOP)?MEM_WB.WB_index:320;//还没WB  修改WB的寄存器
         uint32_t& prev_value1 = EX_MEM.to_WB;
         uint32_t& prev_value2 = MEM_WB.to_WB;
         if(rs==prev_rd1){
-            // if(EX_MEM.instruction==LB||EX_MEM.instruction==LH||
-            // EX_MEM.instruction==LBU||EX_MEM.instruction==LHU||EX_MEM.instruction==LW){
-
-                puts("**********MEM************");
-                WB();
-                MEM();
-                WB();
-                puts("**********MEM************");
-            // }
-            // rs=prev_value1;
-            rs = REGI[rs];
-            puts("-----prev_value1-----");
+            if(EX_MEM.instruction==LB||EX_MEM.instruction==LH||
+            EX_MEM.instruction==LBU||EX_MEM.instruction==LHU||EX_MEM.instruction==LW){
+                WB();MEM();
+            }
+            rs = (prev_rd1==0)?0:prev_value1;
         }
         else if(rs==prev_rd2){
-                puts("**********MEM************");
-                WB();
-                puts("**********MEM************");
-            rs = REGI[rs];
-            puts("-----prev_value2-----");
+            rs = (prev_rd2==0)?0:prev_value2;
         }
         else rs=REGI[rs];
     }
@@ -504,12 +493,12 @@ private:
 
         switch(ID_EX.type){//Fetch Register
             case _U:
-                ID_EX.rd = (num>>7)%32;
+                ID_EX.rd = (num>>7)&31u;
                 ID_EX.imm = (num & 0xFFFFF000UL);//不用移位
             break;
 
             case _J:
-                ID_EX.rd = (num>>7)%32;
+                ID_EX.rd = (num>>7)&31u;
                 if ((num >> 31u) == 1u)
                     ID_EX.imm |= 0xFFF00000UL;
                 ID_EX.imm |= num & 0x000ff000UL;
@@ -518,8 +507,8 @@ private:
             break;
 
             case _B:
-                ID_EX.rs1 = (num>>15)%32;
-                ID_EX.rs2 = (num>>20)%32;
+                ID_EX.rs1 = (num>>15)&31u;
+                ID_EX.rs2 = (num>>20)&31u;
                 check_broadcast(ID_EX.rs1);
                 check_broadcast(ID_EX.rs2);
                 if ((num >> 31u) == 1u)
@@ -530,8 +519,8 @@ private:
             break;
 
             case _I:
-                ID_EX.rs1 = (num>>15)%32;
-                ID_EX.rd = (num>>7)%32;
+                ID_EX.rs1 = (num>>15)&31u;
+                ID_EX.rd = (num>>7)&31u;
                 check_broadcast(ID_EX.rs1);
                 if ((num >> 31u) == 1u)
                     ID_EX.imm |= 0xfffff800;
@@ -539,8 +528,8 @@ private:
             break;
 
             case _S:
-                ID_EX.rs1 = (num>>15)%32;
-                ID_EX.rs2 = (num>>20)%32;
+                ID_EX.rs1 = (num>>15)&31u;
+                ID_EX.rs2 = (num>>20)&31u;
                 check_broadcast(ID_EX.rs1);
                 check_broadcast(ID_EX.rs2);
 
@@ -552,11 +541,11 @@ private:
             break;
 
             case _R:
-                ID_EX.rs1 = (num>>15)%32;
-                ID_EX.rs2 = (num>>20)%32;
+                ID_EX.rs1 = (num>>15)&31u;
+                ID_EX.rs2 = (num>>20)&31u;
                 check_broadcast(ID_EX.rs1);
                 check_broadcast(ID_EX.rs2);
-                ID_EX.rd  = (num>>7)%32;
+                ID_EX.rd  = (num>>7)&31u;
             break;
         }//判断type
         // printf("ID %s  PC = 0x%x  rs1 = %d  rs2 = %d\n",name[ID_EX.instruction],ID_EX.PC,ID_EX.rs1,ID_EX.rs2);
