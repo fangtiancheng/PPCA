@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstring>
 #include <cstdio>
+// #define debug
 //面向硬件编程
 enum INSTRUCTION{
     LUI,      //U
@@ -53,8 +54,8 @@ struct error{
 };
 struct move{};
 struct end{
-    int num,PC;
-    end(int n=0,int pc=0):num(n),PC(pc){}
+    int num;
+    end(int n=0):num(n){}
 };
 inline bool is_num(char c){
     if(c>='0'&&c<='9') return true;
@@ -105,13 +106,6 @@ public:
     uint32_t to_WB=0;
 };
 
-class BroadCast{
-public:
-    bool NOP=true;
-    INSTRUCTION instruction;
-    uint32_t rd=0;//1~31
-    uint32_t value=0;
-};
 
 INSTRUCTION decoder(uint32_t num){//取raw指令,返回指令
     INSTRUCTION instruction;
@@ -310,7 +304,7 @@ private:
     }
     void addi(){//EX阶段解决
         if(ID_EX.rd==10&&ID_EX.imm==0xFF)//结束标记
-            throw end(REGI[ID_EX.rd]&0xFFUL,ID_EX.PC);
+            throw end(REGI[ID_EX.rd]&0xFFUL);
         EX_MEM.WB_index  = ID_EX.rd;
         EX_MEM.to_WB     = ID_EX.rs1+ID_EX.imm;
         EX_MEM.PC        = ID_EX.PC+4;
@@ -471,7 +465,9 @@ private:
     
     void IF(){
         IF_ID.raw_instruction=MEMORY[PC/4];
-        // printf("IF %s  PC = 0x%x\n",name[decoder(IF_ID.raw_instruction)],PC);
+        #ifdef debug
+        printf("IF %s  PC = 0x%x\n",name[decoder(IF_ID.raw_instruction)],PC);
+        #endif
         IF_ID.PC=this->PC;//一开始的PC
         PC+=4;
         IF_ID.NOP=false;
@@ -568,16 +564,19 @@ private:
                 ID_EX.rd  = (num>>7)&31u;
             break;
         }//判断type
-        // printf("ID %s  PC = 0x%x  rs1 = %d  rs2 = %d\n",name[ID_EX.instruction],ID_EX.PC,ID_EX.rs1,ID_EX.rs2);
-        ID_EX.NPC = predictor(ID_EX);//分支预测8
+        #ifdef debug
+        printf("ID %s  PC = 0x%x  rs1 = %d  rs2 = %d\n",name[ID_EX.instruction],ID_EX.PC,ID_EX.rs1,ID_EX.rs2);
+        #endif
+        PC = ID_EX.NPC = predictor(ID_EX);//分支预测8
         ID_EX.NOP = false;//9
     }
 
     void EX(){
         if(ID_EX.NOP) return;//是否为空指令
         else ID_EX.NOP=true;//执行完就把指令清空
-
-        // printf("EX %s  ",name[ID_EX.instruction]);
+        #ifdef debug
+        printf("EX %s  ",name[ID_EX.instruction]);
+        #endif
         switch(ID_EX.instruction){
             case LUI: lui(); break;
             case AUIPC: auipc(); break;
@@ -591,7 +590,9 @@ private:
             case JALR: jalr(); break;
             case LB:  case LH: case LW: case LBU: case LHU: 
             EX_MEM.MEM_index  = ID_EX.rs1+ID_EX.imm;//1 to_WB4
-            // printf("MEM_index(0x%x) = rs1(%d) + imm(%d)",EX_MEM.MEM_index,ID_EX.rs1,ID_EX.imm);
+            #ifdef debug
+            printf("MEM_index(0x%x) = rs1(%d) + imm(%d)",EX_MEM.MEM_index,ID_EX.rs1,ID_EX.imm);
+            #endif
             EX_MEM.WB_index   = ID_EX.rd;//2
             EX_MEM.PC         = ID_EX.PC+4;//3
             break;
@@ -607,7 +608,9 @@ private:
             case SB: case SH: case SW: 
             EX_MEM.to_MEM    = ID_EX.rs2;//5
             EX_MEM.MEM_index = ID_EX.rs1+(int)ID_EX.imm; 
-            // printf("MEM_index(0x%x) = rs1(%d) + imm(%d)",EX_MEM.MEM_index,ID_EX.rs1,ID_EX.imm);
+            #ifdef debug
+            printf("MEM_index(0x%x) = rs1(%d) + imm(%d)",EX_MEM.MEM_index,ID_EX.rs1,ID_EX.imm);
+            #endif
             EX_MEM.PC        = ID_EX.PC+4;
             break;
             case ADD: add(); break;
@@ -621,20 +624,28 @@ private:
             case OR: _or(); break;
             case AND: _and(); break;
         }
-        // printf("PC = 0x%x  ",ID_EX.PC);
-        // if(ID_EX.type!=_S&&ID_EX.type!=_B)
-        //     printf("%d(%s)  imm = %d  ",EX_MEM.to_WB,REGI_name[EX_MEM.WB_index],ID_EX.imm);
+        #ifdef debug
+        printf("PC = 0x%x  ",ID_EX.PC);
+        if(ID_EX.type!=_S&&ID_EX.type!=_B)
+            printf("%d(%s)  imm = %d  ",EX_MEM.to_WB,REGI_name[EX_MEM.WB_index],ID_EX.imm);
+        #endif
         
+        PC=EX_MEM.PC;
         if(ID_EX.NPC!=EX_MEM.PC){//预测失败
-            // puts("jump!!");
+            #ifdef debug
+            puts("jump!!");
+            #endif
             IF_ID.NOP=true;//停止ID
-            PC=EX_MEM.PC;
             if(PREDICT[ID_EX.PC%32]!=0) PREDICT[ID_EX.PC%32]--;
         }//如果预测值不一样，那么暂停流水线
-        else if(ID_EX.type==_B){//预测成功
-            if(PREDICT[ID_EX.PC%32]!=3) PREDICT[ID_EX.PC%32]++;
-        };
-        // else puts("");
+        else {
+            if(ID_EX.type==_B){//预测成功
+                if(PREDICT[ID_EX.PC%32]!=3) PREDICT[ID_EX.PC%32]++;
+            }
+            #ifdef debug
+            puts("");
+            #endif
+        }
         EX_MEM.instruction=ID_EX.instruction;//6
         EX_MEM.type=ID_EX.type;//7
         EX_MEM.NOP=false;//8
@@ -644,8 +655,9 @@ private:
 
         if(EX_MEM.NOP) return;
         else EX_MEM.NOP=true;
-
-        // printf("MEM %s  ",name[EX_MEM.instruction]);
+        #ifdef debug
+        printf("MEM %s  ",name[EX_MEM.instruction]);
+        #endif
         if(EX_MEM.type == _I||EX_MEM.type == _S){//如果是I or S就执行
             switch(EX_MEM.instruction){
                 case LB: lb();break;
@@ -657,11 +669,15 @@ private:
                 case SH: sh();break;
                 case SW: sw();break;
             }
-            // printf("MEM_index = 0x%x  To_MEM = 0x%x  To_WB = 0x%x\n",EX_MEM.MEM_index,EX_MEM.to_MEM,EX_MEM.to_WB);
+            #ifdef debug
+            printf("MEM_index = 0x%x  To_MEM = 0x%x  To_WB = 0x%x\n",EX_MEM.MEM_index,EX_MEM.to_MEM,EX_MEM.to_WB);
+            #endif
             int cur_tick=0;
             while(cur_tick!=3) cur_tick++;
         }
-        // else puts("");
+        #ifdef debug
+        else puts("");
+        #endif
         MEM_WB.type=EX_MEM.type;
         MEM_WB.to_WB=EX_MEM.to_WB;
         MEM_WB.WB_index=EX_MEM.WB_index;
@@ -674,12 +690,16 @@ private:
         else MEM_WB.NOP=true;
 
         if(MEM_WB.type==_S||MEM_WB.type==_B){
-            // printf("WB %s\n",name[MEM_WB.instruction]);
+            #ifdef debug
+            printf("WB %s\n",name[MEM_WB.instruction]);
+            #endif
             return;
         }
         REGI[MEM_WB.WB_index]=MEM_WB.to_WB;
         REGI[0]=0;
-        // printf("WB %s   %d(%s)\n",name[MEM_WB.instruction],MEM_WB.to_WB,REGI_name[MEM_WB.WB_index]);
+        #ifdef debug
+        printf("WB %s   %d(%s)\n",name[MEM_WB.instruction],MEM_WB.to_WB,REGI_name[MEM_WB.WB_index]);
+        #endif
     }
     void copy_into_MEM(){
         uint32_t index=0UL;
@@ -692,11 +712,15 @@ private:
         }
         catch(move e){
             read(index);
-            // printf("move to 0x%x\n",index);
+            #ifdef debug
+            printf("move to 0x%x\n",index);
+            #endif
             goto flag1;
         }
         catch(end e){
-            // puts("successfully read!");
+            #ifdef debug
+            puts("successfully read!");
+            #endif
             index=0;
         }
         catch(error e){
@@ -706,7 +730,6 @@ private:
     }
     public:
     void run(){
-        // puts("begin");
         this->copy_into_MEM();
         PC=0;
         flag2:
@@ -717,7 +740,9 @@ private:
                 EX();
                 try{ID();}catch(...){}
                 IF();
-                // puts("========================");
+                #ifdef debug
+                puts("========================");
+                #endif
             }
         }
         catch(error e){
