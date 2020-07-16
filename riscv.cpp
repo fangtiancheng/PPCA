@@ -422,7 +422,7 @@ private:
         EX_MEM.PC        = ID_EX.PC+4;
     }
     uint32_t predictor(const ID_EXs& ID_EX)const{//预测NPC
-        return ID_EX.PC+4;
+        // return ID_EX.PC+4;
         switch(ID_EX.type){
             case _U:case _S:case _R:
             return ID_EX.PC+4UL;
