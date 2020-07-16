@@ -105,6 +105,13 @@ public:
     uint32_t to_WB=0;
 };
 
+class Reservation_Stations{//保留站
+public:
+    bool busy=false;
+    INSTRUCTION instruction;
+    
+};
+
 class BroadCast{
 public:
     bool NOP=true;
@@ -224,7 +231,6 @@ private:
     ID_EXs ID_EX;
     EX_MEMs EX_MEM;
     MEM_WBs MEM_WB;
-    int8_t PREDICT[32]={0};
 
     void lui(){//EX阶段运行
         EX_MEM.to_WB     = ID_EX.imm;
@@ -421,28 +427,10 @@ private:
         EX_MEM.to_WB     = ID_EX.rs1&ID_EX.rs2;
         EX_MEM.PC        = ID_EX.PC+4;
     }
-    uint32_t predictor(const ID_EXs& ID_EX)const{//预测NPC
-        return ID_EX.PC+4;
-        switch(ID_EX.type){
-            case _U:case _S:case _R:
-            return ID_EX.PC+4UL;
-
-            case _I:
-                if(ID_EX.instruction==JALR) 
-                    return (ID_EX.imm+ID_EX.rs1)&(-2u);
-                else return ID_EX.PC+4;
-
-            case _J:
-            return ID_EX.PC+ID_EX.imm;
-
-            case _B:
-            if(PREDICT[ID_EX.PC%32]<=1) return ID_EX.PC+4;
-            else return ID_EX.PC+ID_EX.imm;
-
-            default: return ID_EX.PC+4;
-        }
+    uint32_t predictor(const ID_EXs& ID_EX){//预测NPC
+        return ID_EX.PC+4UL;
     }
-    void read(uint32_t& num)const{
+    void read(uint32_t& num){
         char ch=getchar();uint32_t x=0;
         while(!is_num(ch)){ch=getchar();}
         while(is_num(ch)){
@@ -451,7 +439,7 @@ private:
         }
         num = x;
     }
-    uint32_t read()const{//把32位码转换成int
+    uint32_t read(){//把32位码转换成int
         char ch[8];
         ch[1] = getchar();
         while(!is_num(ch[1])){ch[1]=getchar();}
@@ -625,15 +613,11 @@ private:
         // if(ID_EX.type!=_S&&ID_EX.type!=_B)
         //     printf("%d(%s)  imm = %d  ",EX_MEM.to_WB,REGI_name[EX_MEM.WB_index],ID_EX.imm);
         
-        if(ID_EX.NPC!=EX_MEM.PC){//预测失败
+        if(ID_EX.NPC!=EX_MEM.PC){
             // puts("jump!!");
             IF_ID.NOP=true;//停止ID
             PC=EX_MEM.PC;
-            if(PREDICT[ID_EX.PC%32]!=0) PREDICT[ID_EX.PC%32]--;
         }//如果预测值不一样，那么暂停流水线
-        else if(ID_EX.type==_B){//预测成功
-            if(PREDICT[ID_EX.PC%32]!=3) PREDICT[ID_EX.PC%32]++;
-        };
         // else puts("");
         EX_MEM.instruction=ID_EX.instruction;//6
         EX_MEM.type=ID_EX.type;//7
@@ -658,8 +642,6 @@ private:
                 case SW: sw();break;
             }
             // printf("MEM_index = 0x%x  To_MEM = 0x%x  To_WB = 0x%x\n",EX_MEM.MEM_index,EX_MEM.to_MEM,EX_MEM.to_WB);
-            int cur_tick=0;
-            while(cur_tick!=3) cur_tick++;
         }
         // else puts("");
         MEM_WB.type=EX_MEM.type;
