@@ -53,8 +53,8 @@ struct error{
 };
 struct move{};
 struct end{
-    int num;
-    end(int n=0):num(n){}
+    int num,PC;
+    end(int n=0,int pc=0):num(n),PC(pc){}
 };
 inline bool is_num(char c){
     if(c>='0'&&c<='9') return true;
@@ -310,7 +310,7 @@ private:
     }
     void addi(){//EX阶段解决
         if(ID_EX.rd==10&&ID_EX.imm==0xFF)//结束标记
-            throw end(REGI[ID_EX.rd]&0xFFUL);
+            throw end(REGI[ID_EX.rd]&0xFFUL,ID_EX.PC);
         EX_MEM.WB_index  = ID_EX.rd;
         EX_MEM.to_WB     = ID_EX.rs1+ID_EX.imm;
         EX_MEM.PC        = ID_EX.PC+4;
