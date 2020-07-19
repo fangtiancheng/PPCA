@@ -2,6 +2,11 @@
 #include <cstring>
 #include <cstdio>
 // #define debug
+// #define check_predict
+const int num_predictor = 256;
+#ifdef check_predict
+int succ_pred=0,fail_pred=0;
+#endif
 //面向硬件编程
 enum INSTRUCTION{
     LUI,      //U
@@ -218,7 +223,7 @@ private:
     ID_EXs ID_EX;
     EX_MEMs EX_MEM;
     MEM_WBs MEM_WB;
-    int8_t PREDICT[32]={0};
+    int8_t PREDICT[num_predictor]={1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 
     void lui(){//EX阶段运行
         EX_MEM.to_WB     = ID_EX.imm;
@@ -430,7 +435,7 @@ private:
             return ID_EX.PC+ID_EX.imm;
 
             case _B:
-            if(PREDICT[ID_EX.PC%32]<=1) return ID_EX.PC+4;
+            if(PREDICT[ID_EX.PC%num_predictor]<=1) return ID_EX.PC+4;//PREDICT 越小就越不跳
             else return ID_EX.PC+ID_EX.imm;
 
             default: return ID_EX.PC+4;
@@ -473,12 +478,6 @@ private:
         IF_ID.NOP=false;
     }
     void check_broadcast(uint32_t& rs){
-        // WB();
-        // MEM();
-        // WB();
-        // rs = REGI[rs];
-        // return;
-//====================================不冒险，直接停=========================================
         const uint32_t prev_rd1 = (EX_MEM.type!=_S && EX_MEM.type!=_B && !EX_MEM.NOP)?EX_MEM.WB_index:320;//还没MEM 修改WB的寄存器
         const uint32_t prev_rd2 = (MEM_WB.type!=_S && MEM_WB.type!=_B && !MEM_WB.NOP)?MEM_WB.WB_index:320;//还没WB  修改WB的寄存器
         uint32_t& prev_value1 = EX_MEM.to_WB;
@@ -629,21 +628,28 @@ private:
         if(ID_EX.type!=_S&&ID_EX.type!=_B)
             printf("%d(%s)  imm = %d  ",EX_MEM.to_WB,REGI_name[EX_MEM.WB_index],ID_EX.imm);
         #endif
-        
+
+        if(ID_EX.type==_B){
+            if(EX_MEM.PC==ID_EX.PC+4){//越小越不跳
+                if(PREDICT[ID_EX.PC%num_predictor]!=0) PREDICT[ID_EX.PC%num_predictor]--;
+            }
+            else {
+                if(PREDICT[ID_EX.PC%num_predictor]!=3) PREDICT[ID_EX.PC%num_predictor]++;
+            }
+        }
         PC=EX_MEM.PC;
         if(ID_EX.NPC!=EX_MEM.PC){//预测失败
-            #ifdef debug
-            puts("jump!!");
-            #endif
             IF_ID.NOP=true;//停止ID
-            if(PREDICT[ID_EX.PC%32]!=0) PREDICT[ID_EX.PC%32]--;
+
+            #ifdef check_predict
+            if(ID_EX.type==_B) ++fail_pred;
+            #endif
         }//如果预测值不一样，那么暂停流水线
         else {
+            #ifdef check_predict
             if(ID_EX.type==_B){//预测成功
-                if(PREDICT[ID_EX.PC%32]!=3) PREDICT[ID_EX.PC%32]++;
+                ++succ_pred;
             }
-            #ifdef debug
-            puts("");
             #endif
         }
         EX_MEM.instruction=ID_EX.instruction;//6
@@ -751,13 +757,15 @@ private:
         }
         catch(end e){
             printf("%d\n",e.num);
+            #ifdef check_predict
+            printf("success ratio = %lf\n",double(succ_pred)/double(fail_pred+succ_pred));
+            #endif
         }
     }
 
 };
 
-int main(){
-    // freopen(".\\testcases\\hanoi.data","r",stdin);
+int main(int argc,char* argv[]){
     CPU my_CPU;
     my_CPU.run();
     return 0;
